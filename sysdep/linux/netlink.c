@@ -1051,7 +1051,24 @@ dest:
       break;
     case RTD_MULTIPATH:
       r->r.rtm_type = RTN_UNICAST;
-      nl_add_multipath(&r->h, rsize, a->nexthops);
+      if ((ea = ea_find(eattrs, EA_KRT_TUNNEL)) &&
+          (i = if_find_by_name(ea->u.ptr->data)))
+      {
+        /*
+         * Tunnel attribute is set, so set the route up using the specified tunnel device
+         * to the originator of the route.
+         */
+        nl_add_attr_u32(&r->h, rsize, RTA_OIF, i->index);
+        nl_add_attr_ipa(&r->h, rsize, RTA_GATEWAY, a->orig_gw);
+        /* nl_add_multipath(&r->h, rsize, a->nexthops); */
+        r->r.rtm_flags |= RTNH_F_ONLINK;
+      }
+      else
+      {
+        /* nl_add_attr_u32(&r->h, rsize, RTA_OIF, iface->index); */
+        /* nl_add_attr_ipa(&r->h, rsize, RTA_GATEWAY, gw); */
+        nl_add_multipath(&r->h, rsize, a->nexthops);
+      }
       break;
     case RTD_NONE:
       break;

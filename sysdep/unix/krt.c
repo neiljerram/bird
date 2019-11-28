@@ -671,6 +671,7 @@ krt_same_dest(rte *k, rte *e)
     case RTD_DEVICE:
       return !strcmp(ka->iface->name, ea->iface->name);
     case RTD_MULTIPATH:
+      /* Also review here */
       return mpnh_same(ka->nexthops, ea->nexthops);
     default:
       return 1;
@@ -744,6 +745,22 @@ krt_got_route(struct krt_proto *p, rte *e)
 	verdict = KRF_UPDATE;
       else if (tmpa &&
 	  (e->attrs->dest == RTD_ROUTER) &&
+	  (ea = ea_find(tmpa, EA_KRT_TUNNEL)) &&
+	  (i = if_find_by_name(ea->u.ptr->data)))
+	{
+	  /* Calico-BIRD specific: we check if the export filter set a tunnel
+	   * attribute for the route.  If it did, and the tunnel interface is
+	   * different from the outgoing interface that is already programmed
+	   * for the route, generate KRF_UPDATE here so that the route gets
+	   * updated to have the tunnel as its outgoing interface.
+	   */
+	  if (!strcmp(i->name, e->attrs->iface->name) && ipa_equal(e->attrs->gw, new->attrs->orig_gw))
+	    verdict = KRF_SEEN;
+	  else
+	    verdict = KRF_UPDATE;
+	}
+      else if (tmpa &&
+	  (e->attrs->dest == RTD_MULTIPATH) &&
 	  (ea = ea_find(tmpa, EA_KRT_TUNNEL)) &&
 	  (i = if_find_by_name(ea->u.ptr->data)))
 	{
